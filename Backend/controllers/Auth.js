@@ -1,5 +1,6 @@
 //importamos el bcrypt
 import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
 import { crearUsuario, obtenerPorEmail } from '../models/usuarios.js';
 
 //registro
@@ -63,59 +64,55 @@ export const registro = async (req, res) => {
 
 //crear login
 export const login = async (req, res) => {
+    try {
+        const { email, password } = req.body;
 
-try {
-    const { email, password } = req.body;
+        //validamos que todos los campos esten llenos
+        if (!email || !password) {
+            return res.status(400).json({ 
+                error: "todos los campos son requeridos"
+            });
+        }
 
-//validamos que todos los capos esten llenos
-if (!email || !password) {
-    return res.status(400).json({ 
-        error: "todos los campos son requeridos"
-    });
-}
+        //validamos si el usuario existe
+        const { data: usuario } = await obtenerPorEmail(email);
+        if (!usuario) {
+            return res.status(400).json({ 
+                error: "el email no esta registrado"
+            });
+        }
 
-//validamos si el usuario existe
-const { data: usuario} = await obtenerPorEmail(email);
-if (!usuario) {
-    return res.status(400).json({ 
-        error: "el email no esta registrado"
-    });
+        //validamos la contraseña
+        const passwordValida = await bcrypt.compare(password, usuario.password);
+        if (!passwordValida) {
+            return res.status(400).json({ 
+                error: "contraseña incorrecta"
+            });
+        }   
 
+        //generamos el token JWT
+        const token = jwt.sign(
+            { 
+                id: usuario.id,
+                nombre: usuario.nombre,
+                email: usuario.email,
+                rol: usuario.rol,
+            },
+            process.env.JWT_SECRET,
+            { expiresIn: '1h' }
+        );
 
+        return res.status(200).json({
+            message: "login exitoso",
+            token: token,
+        });
 
-    //validamos la contraseña
-const passwordValida = await bcrypt.compare(password, usuario.password);
-if (!passwordCorrecto) {
-    return res.status(400).json({ 
-        error: "contraseña incorrecta"
-    });
-}   
-    //generamos el token JWT
-    const token = jwt.sign(
-        { 
-            id: usuario.id ,
-            nombre: usuario.nombre,
-            email: usuario.email,
-            rol: usuario.rol,
-        },
-        process.env.JWT_SECRET,
-        { expiresIn: '1h'}
-    );
-
-    return res.status(200).json({
-        message: "login exitoso",
-        token: token,
-    });
-
-}
-} catch (error) {
-    console.error('error en el login:', error);
-    return res.status(500).json({ 
-        error: error.message 
-    });
-
-}
-
+    } catch (error) {
+        console.error('error en el login:', error);
+        return res.status(500).json({ 
+            error: error.message 
+        });
+    }
 };
 
 

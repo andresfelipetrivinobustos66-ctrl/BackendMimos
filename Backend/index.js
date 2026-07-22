@@ -3,6 +3,8 @@ import dotenv from 'dotenv';
 import { conectaDB,supabase } from './config/supabase.js';
 import AuthRoutes from './routes/auth.js';
 import UserRoutes from './routes/user.js';
+import HeladosRoutes from './routes/helados.js';
+import PedidosRoutes from './routes/pedidos.js';
 
 
 //cargar variables de entorno
@@ -27,6 +29,8 @@ app.get('/', (req, res) => {
 //creamos la ruta de usuario
 app.use('/auth', AuthRoutes);
 app.use('/user', UserRoutes);
+app.use('/api', HeladosRoutes);
+app.use('/api', PedidosRoutes);
 
 
 //configuramos el puerto

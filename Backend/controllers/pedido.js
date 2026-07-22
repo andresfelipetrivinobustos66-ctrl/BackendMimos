@@ -1,6 +1,6 @@
 import { CrearPedido, obtenerPedidoConDetalles, obtenerPedidosPorUsuario, actualizarEstadoPedido, crearDetallePedido } from "../models/pedido.js";
 import { enviarConfirmacionPedido } from "../utils/sendEmail.js";
-import { obtenerPorId as obtenerUsuarios } from "../models/usuarios.js";
+import { obtenerUsuarioPorId as obtenerUsuarios } from "../models/usuarios.js";
 
 export const crearPedidoConDetalles = async (req, res) => {
     try {
@@ -79,7 +79,7 @@ export const obtenerPedidoUsuario = async (req, res) => {
 
 export const misPedidos = async (req, res) => {
     try {
-        const { usuario_id } = req.params;
+        const { usuario_id } = req.query;
 
         if (!usuario_id) {
             return res.status(400).json({ error: 'usuario_id requerido' });

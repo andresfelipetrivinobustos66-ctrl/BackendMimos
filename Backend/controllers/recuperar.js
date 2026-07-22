@@ -1,5 +1,6 @@
-import {crearCodigoRecuperacion} from "../models/recuperar.js";
-import { obtenerPorEmail } from "../models/usuarios.js";
+import {crearCodigoRecuperacion, marcarComoUsado, obtenerCodigoValido} from "../models/recuperar.js";
+import { obtenerPorEmail, actualizarUsuario } from "../models/usuarios.js";
+import bcrypt from 'bcrypt';
 import nodemailer from "nodemailer";
 
 //configuramos el transporte de nodemailer
@@ -9,7 +10,7 @@ const transporter = nodemailer.createTransport({
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS
     }
-})
+});
 
 //configurar la logica para enviar el correo de recuperacion
 export const forgotPassword= async (req, res) => {
@@ -62,3 +63,58 @@ export const forgotPassword= async (req, res) => {
 
     }
 } 
+
+//Cambiar contraseña y verificar el codigo de recuperacion
+
+export const verifyCode = async (req, res) => {
+    try {
+        const { email, codigo, nuevaPassword } = req.body;
+
+        //Verificamos las entradas
+        if (!email || !codigo || !nuevaPassword) {
+            return res.status(400).json({ error: 'Todos los campos son requeridos' });
+        }
+        //Verificar si el usuario esta en la base de datos
+        const { data: usuario } = await obtenerPorEmail(email);
+        if (!usuario) {
+            return res.status(404).json({ error: 'Usuario no encontrado' });
+        }
+        //Verificar si el codigo es valido
+        const { data: codigoValido } = await obtenerCodigoValido(usuario.id, codigo);
+        if (!codigoValido) {
+            return res.status(400).json({ error: 'Código de recuperación inválido o expirado' });
+        }
+        //Encriptamos la nueva contraseña
+        const hashedPassword = await bcrypt.hash(nuevaPassword, 10);
+        //Actualizamos la contraseña del usuario en la base de datos
+        const { error: updateError } = await actualizarUsuario(
+            usuario.id, { password: hashedPassword }
+        )
+        if (updateError) throw updateError;
+        //Marcamos el codigo como usado
+        await marcarComoUsado(codigoValido.id);
+        //Respondemos al cliente que la contraseña se cambio exitosamente
+        await transporter.sendMail({
+            from: process.env.EMAIL_USER,
+            to: email,
+            subject: 'Contraseña cambiada exitosamente',
+            html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; padding: 20px; border-radius: 5px;">
+            <h2 style="color: #333;">Notificación de Cambio de Contraseña</h2>
+            <p>Hola ${usuario.nombre || 'Usuario'},</p>
+            <p> Te informamor que tu contraseña ha sido cambiada exitosamente.</p>
+            <div style="background-color: #f9f9f9; padding: 15px; border-left: 4px solid #398439; margin-top: 20px;">
+            <p style="margin: 0; font-size: 14px; color: #555;">Si no realizaste este cambio, te recomendamos que contactes a nuestro equipo de soporte inmediatamente.</p>
+            </div>
+            <p style="color: #555; font-size: 14px; margin-top: 30px;">Gracias</p>
+            <p>El equipo de soporte</p>
+            </div>
+            `
+        });
+        return res.status(200).json({ message: 'Contraseña cambiada exitosamente' });
+    } catch (error) {
+        console.error('Error al cambiar la contraseña:', error);
+        return res.status(500).json({ error: 'Error al verificar el codigo o cambiar la contraseña' });
+    }
+
+    }
